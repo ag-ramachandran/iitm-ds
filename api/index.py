@@ -1,38 +1,36 @@
-from http.server import BaseHTTPRequestHandler
 import json
-import urllib.parse
+from urllib.parse import parse_qs, urlparse
 
-class Handler(BaseHTTPRequestHandler):
-
-    def load_marks(self):
-        """Load marks from the marks.json file."""
-        try:
-            with open('q-vercel-python.json', 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Error loading marks data: {e}")
-            return {}
+def read_marks_data():
+    try:
+        with open('q-vercel-python.json', 'r') as file:
+            return json.load(file)
+    except Exception as e:
+        print(f"Error reading marks data: {e}")
+        return {}
+    
+# Simulating a custom request handler class
+class Handler:
+    def __init__(self, req, res):
+        self.req = req
+        self.res = res
 
     def do_GET(self):
-        # Parse query parameters
-        parsed_path = urllib.parse.urlparse(self.path)
-        query_params = urllib.parse.parse_qs(parsed_path.query)
-
-        # Get names from query parameters
+        # Parse query parameters from the URL
+        query_params = parse_qs(urlparse(self.req.url).query)
         names = query_params.get('name', [])
         
-        # Load marks data from file
-        marks_data = self.load_marks()
+        # Retrieve marks for each name in the query, maintain order
+        marks = [read_marks_data().get(name, "Not Found") for name in names]
+        
+        # Prepare the response data
+        response_data = {"marks": marks}
+        
+        # Set response status and return JSON
+        self.res.status(200).json(response_data)
 
-        # Find the marks for the names
-        marks = [marks_data.get(name, 0) for name in names]
-
-        # Return the response
-        response = {
-            "marks": marks
-        }
-
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps(response).encode())
+# Vercel serverless function handler
+def handler(req, res):
+    # Create an instance of the Handler class and process the request
+    handler_instance = Handler(req, res)
+    handler_instance.do_GET()  # Call the method to process the GET request
